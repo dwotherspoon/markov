@@ -2,19 +2,69 @@
 
 import argparse
 import pickle
+import random
 
-from tokeniser import Tokeniser
+from tokeniser import Tokeniser, ControlTokens
 
 def train(args):
+    n = args.n
     with open(args.text, 'rt') as fp:
         tokens = [tok for tok in Tokeniser(fp)]
-        print(list(tokens[0:1000]))
 
-def gen(args):
+    data = {}
+    prefix = (ControlTokens.NULL,) * n
+
+    for tok in tokens:
+        # Clear the prefix if we're starting again.
+        if tok == ControlTokens.START:
+            prefix = (ControlTokens.NULL,) * n
+        # Add current token (suffix) to all tokens in the prefix buffer.
+        if not prefix in data:
+            data[prefix] = [0, {}]
+        data[prefix][0] += 1
+        data[prefix][1][tok] = data[prefix][1].get(tok, 0) + 1
+        prefix += (tok,)
+        prefix = prefix[1:]
+    save_data(args.out, data)
+
+def save_data(file, data):
+    with open(file, "wb") as fp:
+        pickle.dump(data, fp)
+
+def load_data(files):
     raise NotImplementedError()
+    
+def gen(args):
+    n = args.n
+    load_data(args.data)
+    result = []
+    tok = ControlTokens.START
+    prefix = (ControlTokens.NULL,) * n
+    while tok not in Tokeniser.TERM_TOKENS:
+        result.append(tok)
+        tok = make_choice(data, prefix)
+        prefix += (tok,)
+        prefix = prefix[1:]
+    result.append(tok)
+    print(result)
+
+def make_choice(data, prefix):
+    assert prefix in data
+    total, suffixes = data[prefix]
+    idx = random.randrange(0, total)
+    for suffix, weight in suffixes.items():
+        if idx <= weight:
+            return suffix
+        idx -= weight
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    parser.add_argument("-n",
+                        type=int,
+                        help="Chain size",
+                        required=True)
+
     subparsers = parser.add_subparsers(dest="action",
                                         required=True)
     # Options for training
@@ -23,10 +73,16 @@ if __name__ == "__main__":
     parser_train.add_argument("--text",
                                 help="Input text file",
                                 required=True)
+    parser_train.add_argument("--out",
+                                help="Output data file name",
+                                required=True)
 
     # Options for generating
     parser_gen = subparsers.add_parser("GEN",
                                         help="GENerate text from supplied datasets.")
+    parser_gen.add_argument("--data",
+                            help="Input data file(s)",
+                            required=True)
 
     # Transfer control to correct function
     args = parser.parse_args()
