@@ -25,18 +25,26 @@ def train(args):
         data[prefix][1][tok] = data[prefix][1].get(tok, 0) + 1
         prefix += (tok,)
         prefix = prefix[1:]
-    save_data(args.out, data)
+    normal_data = normalise_data(data)
+    save_data(args.out, normal_data)
+
+def normalise_data(data):
+    result = {}
+    for k, v in data.items():
+        total_weight, suffixes = v
+        result[k] = {suff: weight/total_weight for suff, weight in suffixes.items()}
+    return result
 
 def save_data(file, data):
     with open(file, "wb") as fp:
         pickle.dump(data, fp)
 
 def load_data(files):
-    raise NotImplementedError()
+    return pickle.load(open(files, "rb"))
     
 def gen(args):
     n = args.n
-    load_data(args.data)
+    data = load_data(args.data)
     result = []
     tok = ControlTokens.START
     prefix = (ControlTokens.NULL,) * n
@@ -48,10 +56,11 @@ def gen(args):
     result.append(tok)
     print(result)
 
+# Assumes normalised data
 def make_choice(data, prefix):
     assert prefix in data
-    total, suffixes = data[prefix]
-    idx = random.randrange(0, total)
+    suffixes = data[prefix]
+    idx = random.random()
     for suffix, weight in suffixes.items():
         if idx <= weight:
             return suffix

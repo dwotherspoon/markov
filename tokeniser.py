@@ -21,7 +21,7 @@ class Tokeniser:
                       '?' : ControlTokens.QMARK,
                       '!' : ControlTokens.EXCMARK}
 
-    def __init__(self, stream, ignore_newline=True):
+    def __init__(self, stream, ignore_newline=False):
         self._stream = stream
         self._ignore_newline = ignore_newline
     
